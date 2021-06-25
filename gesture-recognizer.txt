@@ -1,1 +1,32 @@
+# Author: Sarah
+# Reviewer: Jonas
+
+Vatavu, R. D., Anthony, L., & Wobbrock, J. O. (2012, October). Gestures as point clouds: a $ P recognizer 
+for user interface prototypes. In Proceedings of the 14th ACM international conference on Multimodal 
+interaction (pp. 273-280).
+#############################################
  
+ What does the recognizer do?
+- It is a recognizer for User Interface Prototypes and can identify unistrokes and multistrokes gestures.
+- Gestures are not interpreted as strokes, but as sets of dots called clouds. 
+- The used algorithm is low-cost, easy to understand and implement.
+
+#############################################
+Name an advantage of the $P recognizer over the $1 recognizer.
+- In contrast to the $1 recogniser, the $P recogniser can recognise unistroke as well as multistroke gestures. 
+- Furthermore, due to the interpretation of the gestures as clouds of points, the direction of the strokes and 
+  the order of the strokes do not matter in the $P recognisizer. As a result, the different variants of the 
+  execution of a gesture can no longer be distinguished due to the missing time component and thus less memory is required.
+
+#############################################
+What is the minimum matching distance?
+- TODO
+- We define the matching between two point clouds C and T as a function M that associates each point Ci ∈ C with exactly one 
+  point Tj ∈ T , Tj = M(Ci ). 
+- If C and T have been both resampled4 into the same number of points n, then the matching will also consist of exactly n pairs of points. 
+- Inspired by the Euclidean sum of $1 [23] and the Proportional Shape Distance of Shark2 [13], we define the goodness of 
+  matching M as the sum of Euclidean distances for all the pairs of points from M
+- Assignment Problem represented as a problem from graph theory
+- Hungarian algorithm to complex and slow
+- heuristics for matching clouds named Greedy
+- Greedy-5 performs best
