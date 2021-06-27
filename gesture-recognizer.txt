@@ -20,13 +20,8 @@ Name an advantage of the $P recognizer over the $1 recognizer.
 
 #############################################
 What is the minimum matching distance?
-- TODO
-- We define the matching between two point clouds C and T as a function M that associates each point Ci ∈ C with exactly one 
-  point Tj ∈ T , Tj = M(Ci ). 
-- If C and T have been both resampled4 into the same number of points n, then the matching will also consist of exactly n pairs of points. 
-- Inspired by the Euclidean sum of $1 [23] and the Proportional Shape Distance of Shark2 [13], we define the goodness of 
-  matching M as the sum of Euclidean distances for all the pairs of points from M
-- Assignment Problem represented as a problem from graph theory
-- Hungarian algorithm to complex and slow
-- heuristics for matching clouds named Greedy
-- Greedy-5 performs best
+- Is the matching between two point clouds. In the paper, the goodness of matching M is defined as the sum of the 
+  Euclidean distances for all pairs of points from M.
+- As heuristic Greedy-5 is used. For each point in the first cloud (Ci ), the nearest point from the second cloud 
+  that has not yet been assigned is searched for. The matches are wigthed with confidence valus between 0 and 1 
+  to reduce execution time. -> O(n^(2+e))
