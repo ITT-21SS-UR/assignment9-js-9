@@ -4,6 +4,7 @@ import pyqtgraph.flowchart.library as fclib
 from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 from enum import Enum
 
+import DIPPID_pyqtnode
 from QDrawWidget import QDrawWidget
 import gesture_recognizer_model as model
 
@@ -188,8 +189,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         layout = QtGui.QGridLayout()
         layout.addWidget(self.__fc.widget(), 0, 0, 2, 1)
-        # text = QtWidgets.QLabel("** predicted category will be shown here**")
-        # layout.addWidget(text, 0, 1)
+        text = QtWidgets.QLabel("** predicted category will be shown here**")
+        layout.addWidget(text, 1, 1)
 
         draw_widget = QDrawWidget()
         draw_widget.custom_filter = model.custom_filter
@@ -199,4 +200,18 @@ class MainWindow(QtWidgets.QMainWindow):
         cw.setLayout(layout)
         self.setCentralWidget(cw)
 
-        # self.__categoryText = text
+        self.__setup_nodes()
+
+    def __setup_nodes(self):
+        buf_x = self.__fc.createNode("Buffer", pos=(150, -50))
+        buf_y = self.__fc.createNode("Buffer", pos=(150, 0))
+       
+        transform_node = self.__fc.createNode("TransformNode", pos=(300, 50)) # TODO
+        svm_node = self.__fc.createNode("SVM", pos=(450, 0))
+       
+        self.__fc.connectTerminals(buf_x["dataOut"], transform_node["accelX"])
+        self.__fc.connectTerminals(buf_y["dataOut"], transform_node["accelY"])
+
+        self.__fc.connectTerminals(transform_node["dspOut"], svm_node["dataIn"])
+
+        svm_node.ctrlWidget().training_started.connect(lambda: transform_node.clear())
