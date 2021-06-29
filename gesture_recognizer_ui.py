@@ -1,92 +1,133 @@
-import sys
-from pyqtgraph.flowchart import Flowchart, Node
-import pyqtgraph.flowchart.library as fclib
-from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
 from enum import Enum
+from QDrawWidget import *
+import gesture_recognizer_transform as transform
+import sys
 
-import DIPPID_pyqtnode
-from QDrawWidget import QDrawWidget
-import gesture_recognizer_model as model
+class GestureMode(Enum):
+    Training = 1
+    Recognition = 2
 
+class GestureModel(QtCore.QObject):
 
-class SvmNodeCtrl(QtGui.QWidget):
-
-    class SvmMode(Enum):
-        Inactive = 1
-        Training = 2
-        Prediction = 3
-
-    training_started = QtCore.pyqtSignal()
-    data_changed = QtCore.pyqtSignal()
     mode_changed = QtCore.pyqtSignal()
+    data_changed = QtCore.pyqtSignal()
+    data_saved = QtCore.pyqtSignal()
+    gesture_recognized = QtCore.pyqtSignal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        self.__mode = SvmNodeCtrl.SvmMode.Inactive
-        self.__setup_ui()
-
+        self.__mode = GestureMode.Training
         self.__data = {}
+        self.__pending_data = []
 
     def get_mode(self):
         return self.__mode
 
-    def get_categories(self):
-        categories = []
+    def set_mode(self, mode):
+        self.__mode = mode
+        self.mode_changed.emit()
 
-        for i in range(self.__cat_list.count()):
-            categories.append(self.__cat_list.itemText(i))
-
-        return categories
-
-    def get_category_name(self, index=None):
-        if index is None:
-            return self.__cat_list.currentText()
-
-        return self.__cat_list.itemText(index)
-
-    def get_all_data(self):
-        return self.__data
-
-    def get_data(self):
-        if not self.__data:
-            return []
-
-        return self.__data[self.get_category_name()]
+    def has_data(self, gesture_name):
+        return len(self.__data[gesture_name]) > 0
+    
+    def is_data_available(self):
+        return len(self.__pending_data) > 0
 
     def set_data(self, data):
         if len(data) > 0:
-            self.__data[self.get_category_name()].append(data)
+            self.__pending_data = transform.normalize(data)
+        else:
+            self.__pending_data = []
 
-        self.__update_training_buttons()
+        self.data_changed.emit()
+
+    def recognize(self):
+        if self.__mode != GestureMode.Recognition:
+            return
+
+        if not self.__pending_data:
+            self.gesture_recognized.emit(None)
+            return
+
+        best_match = (sys.maxsize, None)
+        for gesture, data_set in self.__data.items():
+            for data in data_set:
+                sim = transform.calculate_similarity(self.__pending_data, data)
+                if sim < best_match[0]:
+                    best_match = (sim, gesture)
+
+        if best_match[0] > 1500:
+            self.gesture_recognized.emit("** no match **")
+        else:
+            self.gesture_recognized.emit(best_match[1])
+
+    def clear(self):
+        self.__pending_data = []
+        self.data_changed.emit()
+
+    def save_data(self, gesture_name):
+        self.__data[gesture_name].append(self.__pending_data)
+        self.clear()
+        self.data_changed.emit()
+        self.data_saved.emit()
+
+    def add_gesture(self, name):
+        self.clear_gesture(name)
+
+    def clear_gesture(self, name):
+        self.__data[name] = []
+        self.data_changed.emit()
+
+    def delete_gesture(self, name):
+        self.__data.pop(name)
+        self.data_changed.emit()
+
+class GestureWidget(QtGui.QWidget):
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.__model = GestureModel()
+        self.__setup_ui()
+
+    def get_gesture_name(self, index=None):
+        if index is None:
+            return self.__gestures_list.currentText()
+
+        return self.__gestures_list.itemText(index)
+
+    def get_model(self):
+        return self.__model
+
+    def set_model(self, model):
+        self.__model = model
 
     def __setup_ui(self):
         layout = QtWidgets.QVBoxLayout()
 
         mode_group = QtWidgets.QGroupBox("Mode")
-        inactive_button = QtWidgets.QRadioButton("Inactive", mode_group)
-        inactive_button.setChecked(True)
-        training_button = QtWidgets.QRadioButton("Training", mode_group)
-        prediction_button = QtWidgets.QRadioButton("Prediction", mode_group)
+        training_mode_button = QtWidgets.QRadioButton("Training", mode_group)
+        training_mode_button.setChecked(True)
+        recognition_mode_button = QtWidgets.QRadioButton("Recognition", mode_group)
         mode_group_layout = QtWidgets.QVBoxLayout()
-        mode_group_layout.addWidget(inactive_button)
-        mode_group_layout.addWidget(training_button)
-        mode_group_layout.addWidget(prediction_button)
+        mode_group_layout.addWidget(training_mode_button)
+        mode_group_layout.addWidget(recognition_mode_button)
         mode_group.setLayout(mode_group_layout)
 
-        categories_group = QtWidgets.QGroupBox("Categories")
-        cat_name_edit = QtWidgets.QLineEdit()
-        cat_name_label = QtWidgets.QLabel("New category name")
-        cat_name_label.setBuddy(cat_name_edit)
-        cat_add_button = QtWidgets.QToolButton()
-        cat_add_button.setText("+")
-        cat_name_layout = QtWidgets.QHBoxLayout()
-        cat_name_layout.addWidget(cat_name_edit)
-        cat_name_layout.addWidget(cat_add_button)
-        cat_list = QtWidgets.QComboBox()
-        train_button = QtWidgets.QPushButton("Train")
-        train_button.setEnabled(False)
-        train_button.setCheckable(True)
+        gestures_group = QtWidgets.QGroupBox("Gestures")
+        gesture_name_edit = QtWidgets.QLineEdit()
+        gesture_name_label = QtWidgets.QLabel("New gesture name")
+        gesture_name_label.setBuddy(gesture_name_edit)
+        gesture_add_button = QtWidgets.QToolButton()
+        gesture_add_button.setText("+")
+        gesture_name_layout = QtWidgets.QHBoxLayout()
+        gesture_name_layout.addWidget(gesture_name_edit)
+        gesture_name_layout.addWidget(gesture_add_button)
+        gestures_list = QtWidgets.QComboBox()
+        save_button = QtWidgets.QPushButton("Save")
+        save_button.setEnabled(False)
         reset_button = QtWidgets.QPushButton("Reset")
         reset_button.setEnabled(False)
         delete_button = QtWidgets.QPushButton("Delete")
@@ -94,124 +135,122 @@ class SvmNodeCtrl(QtGui.QWidget):
         button_layout = QtWidgets.QHBoxLayout()
         button_layout.addWidget(reset_button)
         button_layout.addWidget(delete_button)
-        categories_group_layout = QtWidgets.QVBoxLayout()
-        categories_group_layout.addWidget(cat_name_label)
-        categories_group_layout.addLayout(cat_name_layout)
-        categories_group_layout.addWidget(cat_list)
-        categories_group_layout.addWidget(train_button)
-        categories_group_layout.addLayout(button_layout)
-        categories_group.setLayout(categories_group_layout)
+        gestures_group_layout = QtWidgets.QVBoxLayout()
+        gestures_group_layout.addWidget(gesture_name_label)
+        gestures_group_layout.addLayout(gesture_name_layout)
+        gestures_group_layout.addWidget(gestures_list)
+        gestures_group_layout.addWidget(save_button)
+        gestures_group_layout.addLayout(button_layout)
+        gestures_group.setLayout(gestures_group_layout)
 
+        recognition_group = QtWidgets.QGroupBox("Recognized Gesture")
+        recognized_gesture_label = QtWidgets.QLabel()
+        recognized_gesture_label.setAlignment(QtCore.Qt.AlignCenter)
+        recognition_group_layout = QtWidgets.QVBoxLayout()
+        recognition_group_layout.addWidget(recognized_gesture_label)
+        recognition_group.setLayout(recognition_group_layout)
+
+        layout.addWidget(recognition_group)
+        layout.addStretch()
         layout.addWidget(mode_group)
-        layout.addWidget(categories_group)
+        layout.addWidget(gestures_group)
 
         self.setLayout(layout)
-        self.__cat_list = cat_list
-        self.__cat_name_edit = cat_name_edit
-        self.__train_button = train_button
+        self.__gestures_group = gestures_group
+        self.__gestures_list = gestures_list
+        self.__gesture_name_edit = gesture_name_edit
+        self.__train_button = save_button
         self.__reset_button = reset_button
         self.__delete_button = delete_button
+        self.__recognized_gesture_label = recognized_gesture_label
 
-        inactive_button.clicked.connect(self.__on_mode_changed)
-        training_button.clicked.connect(self.__on_mode_changed)
-        prediction_button.clicked.connect(self.__on_mode_changed)
-        cat_add_button.clicked.connect(self.__on_add_category)
-        delete_button.clicked.connect(self.__on_delete_category)
-        train_button.clicked.connect(self.__on_train_clicked)
-        reset_button.clicked.connect(self.__clear_data)
+        training_mode_button.clicked.connect(self.__on_mode_button_clicked)
+        recognition_mode_button.clicked.connect(self.__on_mode_button_clicked)
+        gesture_add_button.clicked.connect(self.__on_add_gesture)
+        delete_button.clicked.connect(self.__on_delete_gesture)
+        save_button.clicked.connect(lambda: self.__model.save_data(self.get_gesture_name()))
+        reset_button.clicked.connect(lambda: self.__model.clear_gesture(self.get_gesture_name()))
+
+        self.__model.mode_changed.connect(self.__on_mode_changed)
+        self.__model.data_changed.connect(self.__on_model_data_changed)
+        self.__model.gesture_recognized.connect(self.__set_recognized_gesture)
+        self.__set_recognized_gesture()
+
+    def __on_mode_button_clicked(self):
+        if self.sender().text() == "Training":
+            self.__model.set_mode(GestureMode.Training)
+
+        if self.sender().text() == "Recognition":
+            self.__model.set_mode(GestureMode.Recognition)
 
     def __on_mode_changed(self):
-        if self.sender().text() == "Inactive":
-            self.__mode = SvmNodeCtrl.SvmMode.Inactive
+        if self.__model.get_mode() == GestureMode.Training:
+            self.__gestures_group.setEnabled(True)
 
-        if self.sender().text() == "Training":
-            self.__mode = SvmNodeCtrl.SvmMode.Training
+        if self.__model.get_mode() == GestureMode.Recognition:
+            self.__gestures_group.setEnabled(False)
 
-        if self.sender().text() == "Prediction":
-            self.__mode = SvmNodeCtrl.SvmMode.Prediction
+        self.__set_recognized_gesture()
 
-        self.__update_training_buttons()
-        self.mode_changed.emit()
-
-    def __on_add_category(self):
-        name = self.__cat_name_edit.text()
+    def __on_add_gesture(self):
+        name = self.__gesture_name_edit.text()
         if not name:
             return
 
-        if self.__cat_list.findText(name, QtCore.Qt.MatchFixedString) >= 0:
+        if self.__gestures_list.findText(name, QtCore.Qt.MatchFixedString) >= 0:
             return
 
-        self.__cat_name_edit.setText("")
-        self.__cat_list.addItem(name)
-        self.__cat_list.setCurrentIndex(self.__cat_list.count() - 1)
-        self.__data[name] = []
-        self.__update_training_buttons()
+        self.__gesture_name_edit.setText("")
+        self.__gestures_list.addItem(name)
+        self.__gestures_list.setCurrentIndex(self.__gestures_list.count() - 1)
+        self.__model.add_gesture(name)
 
-    def __on_delete_category(self):
-        self.__data.pop(self.get_category_name())
-        self.__cat_list.removeItem(self.__cat_list.currentIndex())
+    def __on_delete_gesture(self):
+        name = self.get_gesture_name()
+        self.__gestures_list.removeItem(self.__gestures_list.currentIndex())
+        self.__model.delete_gesture(name)
+
+    def __on_model_data_changed(self):
         self.__update_training_buttons()
-        self.data_changed.emit()
+        self.__model.recognize()
 
     def __update_training_buttons(self):
-        self.__delete_button.setEnabled(self.__cat_list.count() > 0)
+        if self.__model.get_mode() != GestureMode.Training:
+            return
 
-        can_enable_reset_btn = self.__cat_list.count() > 0 \
-            and len(self.get_data()) > 0 \
-            and self.__mode == SvmNodeCtrl.SvmMode.Training
+        self.__delete_button.setEnabled(self.__gestures_list.count() > 0)
+
+        can_enable_reset_btn = self.__gestures_list.count() > 0 \
+                                    and self.__model.has_data(self.get_gesture_name())
         self.__reset_button.setEnabled(can_enable_reset_btn)
 
-        can_enable_training_btn = self.__cat_list.count() > 0 \
-            and self.__mode == SvmNodeCtrl.SvmMode.Training
+        can_enable_training_btn = self.__gestures_list.count() > 0 \
+                                    and self.__model.is_data_available()
         self.__train_button.setEnabled(can_enable_training_btn)
 
-    def __on_train_clicked(self, checked):
-        if checked:
-            self.__train_button.setText("Training...")
-            self.training_started.emit()
-        else:
-            self.__train_button.setText("Train")
-            self.data_changed.emit()
-
-    def __clear_data(self):
-        self.__data[self.get_category_name()] = []
-        self.__update_training_buttons()
-
+    def __set_recognized_gesture(self, gesture=None):
+        text = "** n/a **" if not gesture else gesture
+        self.__recognized_gesture_label.setText("<b>" + text + "</b>")
 
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        self.setWindowTitle("Activity Recognizer")
+        self.setWindowTitle("Gesture Recognizer")
 
-        self.__fc = Flowchart()
+        layout = QtWidgets.QHBoxLayout()
 
-        layout = QtGui.QGridLayout()
-        layout.addWidget(self.__fc.widget(), 0, 0, 2, 1)
-        text = QtWidgets.QLabel("** predicted category will be shown here**")
-        layout.addWidget(text, 1, 1)
+        gesture = GestureWidget()
+        layout.addWidget(gesture)
 
         draw_widget = QDrawWidget()
-        draw_widget.custom_filter = model.custom_filter
-        layout.addWidget(draw_widget, 0, 1)
+        layout.addWidget(draw_widget, 1)
+
+        draw_widget.drawing_finished.connect(lambda: gesture.get_model().set_data(draw_widget.points))
+        gesture.get_model().data_saved.connect(draw_widget.clear)
+        gesture.get_model().mode_changed.connect(draw_widget.clear)
 
         cw = QtGui.QWidget()
         cw.setLayout(layout)
         self.setCentralWidget(cw)
-
-        self.__setup_nodes()
-
-    def __setup_nodes(self):
-        buf_x = self.__fc.createNode("Buffer", pos=(150, -50))
-        buf_y = self.__fc.createNode("Buffer", pos=(150, 0))
-       
-        transform_node = self.__fc.createNode("TransformNode", pos=(300, 50)) # TODO
-        svm_node = self.__fc.createNode("SVM", pos=(450, 0))
-       
-        self.__fc.connectTerminals(buf_x["dataOut"], transform_node["accelX"])
-        self.__fc.connectTerminals(buf_y["dataOut"], transform_node["accelY"])
-
-        self.__fc.connectTerminals(transform_node["dspOut"], svm_node["dataIn"])
-
-        svm_node.ctrlWidget().training_started.connect(lambda: transform_node.clear())

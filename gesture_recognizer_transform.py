@@ -1,7 +1,5 @@
 from math import sin, cos, pi, sqrt, atan2
 
-import sys
-import numpy as np
 from numpy import matrix
 
 def distance(p1, p2):
@@ -157,12 +155,6 @@ def normalize(points):
     points_new = scale(points_new)
     
     return points_new
-
-def custom_filter(points):
-    return(normalize(points))
-
-def transpose_points(points):
-    return list(map(list, zip(*points)))
 
 def calculate_similarity(sample, template):
     dist_all = 0

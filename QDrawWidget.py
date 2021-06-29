@@ -2,9 +2,11 @@ from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 
 class QDrawWidget(QtWidgets.QWidget):
     
+    drawing_finished = QtCore.pyqtSignal()
+
     def __init__(self, width=800, height=800):
         super().__init__()
-        self.resize(width, height)
+        self.setMinimumSize(width, height)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.drawing = False
         self.grid = True
@@ -16,23 +18,23 @@ class QDrawWidget(QtWidgets.QWidget):
         self.setWindowTitle('Drawable')
         self.show()
         
+    def clear(self):
+        self.drawing = False
+        self.points = []
+        self.update()
+        self.drawing_finished.emit()
+
     def mousePressEvent(self, ev):
         if ev.button() == QtCore.Qt.LeftButton:
             self.drawing = True
             self.points = []
-            self.update()
-        elif ev.button() == QtCore.Qt.RightButton:
-            try:
-                self.points = custom_filter(self.points) # needs to be implemented outside!
-            except NameError:
-                pass
-            
             self.update()
             
     def mouseReleaseEvent(self, ev):
         if ev.button() == QtCore.Qt.LeftButton:
             self.drawing = False
             self.update() 
+            self.drawing_finished.emit()
 
     def mouseMoveEvent(self, ev):
         if self.drawing:
