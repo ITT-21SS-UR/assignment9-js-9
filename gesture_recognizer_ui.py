@@ -4,9 +4,18 @@ from QDrawWidget import *
 import gesture_recognizer_transform as transform
 import sys
 
+# Overwiew
+# Setup classes: GestureMode, GestureModel, GestureWidget and MainWindow
+# Define the two modes (training vs. recognition)
+# Initialize the model gestures
+# Setup the UI to add and recognize gestures
+# Connect the UI with the QDrawWidget
+
+
 class GestureMode(Enum):
-    Training = 1
-    Recognition = 2
+    Training = 1  # ModeOne to train a added gesture
+    Recognition = 2  # ModeTwo to reconize the drawn gesture
+
 
 class GestureModel(QtCore.QObject):
 
@@ -31,7 +40,7 @@ class GestureModel(QtCore.QObject):
 
     def has_data(self, gesture_name):
         return len(self.__data[gesture_name]) > 0
-    
+
     def is_data_available(self):
         return len(self.__pending_data) > 0
 
@@ -84,6 +93,9 @@ class GestureModel(QtCore.QObject):
         self.__data.pop(name)
         self.data_changed.emit()
 
+# setup the graphical user interface where the user can add new gestures/symbols to be recognized
+
+
 class GestureWidget(QtGui.QWidget):
 
     def __init__(self, parent=None):
@@ -104,9 +116,16 @@ class GestureWidget(QtGui.QWidget):
     def set_model(self, model):
         self.__model = model
 
+# Setup the ui
+# Implementation of three boxes:
+# Box1: for choosing the mode (training or recognition)
+# Box2: for adding new gestures and train them
+# Box3: to display the recognized gesture
+
     def __setup_ui(self):
         layout = QtWidgets.QVBoxLayout()
 
+        # create Box1
         mode_group = QtWidgets.QGroupBox("Mode")
         training_mode_button = QtWidgets.QRadioButton("Training", mode_group)
         training_mode_button.setChecked(True)
@@ -116,6 +135,7 @@ class GestureWidget(QtGui.QWidget):
         mode_group_layout.addWidget(recognition_mode_button)
         mode_group.setLayout(mode_group_layout)
 
+        # create Box2
         gestures_group = QtWidgets.QGroupBox("Gestures")
         gesture_name_edit = QtWidgets.QLineEdit()
         gesture_name_label = QtWidgets.QLabel("New gesture name")
@@ -143,6 +163,7 @@ class GestureWidget(QtGui.QWidget):
         gestures_group_layout.addLayout(button_layout)
         gestures_group.setLayout(gestures_group_layout)
 
+        # create Box3
         recognition_group = QtWidgets.QGroupBox("Recognized Gesture")
         recognized_gesture_label = QtWidgets.QLabel()
         recognized_gesture_label.setAlignment(QtCore.Qt.AlignCenter)
@@ -164,6 +185,7 @@ class GestureWidget(QtGui.QWidget):
         self.__delete_button = delete_button
         self.__recognized_gesture_label = recognized_gesture_label
 
+        # Connect buttons with functions
         training_mode_button.clicked.connect(self.__on_mode_button_clicked)
         recognition_mode_button.clicked.connect(self.__on_mode_button_clicked)
         gesture_add_button.clicked.connect(self.__on_add_gesture)
@@ -177,13 +199,16 @@ class GestureWidget(QtGui.QWidget):
         self.__set_recognized_gesture()
 
     def __on_mode_button_clicked(self):
+        # User choose RadioButton Training
         if self.sender().text() == "Training":
             self.__model.set_mode(GestureMode.Training)
 
+        # User choose RadioButton Recognition
         if self.sender().text() == "Recognition":
             self.__model.set_mode(GestureMode.Recognition)
 
     def __on_mode_changed(self):
+        # Disable Box2 when the User choose the recognition mode
         if self.__model.get_mode() == GestureMode.Training:
             self.__gestures_group.setEnabled(True)
 
@@ -192,6 +217,7 @@ class GestureWidget(QtGui.QWidget):
 
         self.__set_recognized_gesture()
 
+    # add new gesture and check duplicates
     def __on_add_gesture(self):
         name = self.__gesture_name_edit.text()
         if not name:
@@ -205,6 +231,7 @@ class GestureWidget(QtGui.QWidget):
         self.__gestures_list.setCurrentIndex(self.__gestures_list.count() - 1)
         self.__model.add_gesture(name)
 
+    # remove gesture from list
     def __on_delete_gesture(self):
         name = self.get_gesture_name()
         self.__gestures_list.removeItem(self.__gestures_list.currentIndex())
@@ -228,9 +255,13 @@ class GestureWidget(QtGui.QWidget):
                                     and self.__model.is_data_available()
         self.__train_button.setEnabled(can_enable_training_btn)
 
+    # Show the user the recognized gesture
     def __set_recognized_gesture(self, gesture=None):
-        text = "** n/a **" if not gesture else gesture
+        text = "** n/a **" if not gesture else gesture  # n/a default
         self.__recognized_gesture_label.setText("<b>" + text + "</b>")
+
+# setup the MainWindow
+
 
 class MainWindow(QtWidgets.QMainWindow):
 
