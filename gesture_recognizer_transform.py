@@ -1,6 +1,12 @@
 from math import sin, cos, pi, sqrt, atan2
-
 from numpy import matrix
+
+
+'''
+The code for normalisation of the data points has been taken from the
+jupyter notebook used in the lecture and modified.
+'''
+
 
 def distance(p1, p2):
     # basic vector norm
@@ -64,7 +70,7 @@ def resample(point_list, step_count=64):
             new_points.append([nx, ny])
             point_list.insert(i, [nx, ny])
 
-            # reset curpos
+            # reset current position
             current_pos = 0
         else:
             current_pos += d
@@ -73,79 +79,83 @@ def resample(point_list, step_count=64):
 
     return new_points
 
+
 def rotate(points, center, angle_degree):
     new_points = []
-    
+
     # represent our angle in radians
     angle_rad = angle_degree * (pi / 180)
-    
-    # define a 3x3 rotation matrix for clockwise rotation 
+
+    # define a 3x3 rotation matrix for clockwise rotation
     rot_matrix = matrix([[cos(angle_rad), -sin(angle_rad), 0],
-                         [sin(angle_rad),  cos(angle_rad), 0], 
-                         [      0,               0,        1]])
-    
-    t1 = matrix([[1, 0, -center[0]], 
+                         [sin(angle_rad),  cos(angle_rad), 0],
+                         [0,               0,        1]])
+
+    t1 = matrix([[1, 0, -center[0]],
                  [0, 1, -center[1]],
-                 [0, 0,     1     ]])
-    
-    t2 = matrix([[1, 0,  center[0]], 
+                 [0, 0,     1]])
+
+    t2 = matrix([[1, 0,  center[0]],
                  [0, 1,  center[1]],
-                 [0, 0,     1     ]])
-    
+                 [0, 0,     1]])
+
     # create our actual transformation matrix which rotates a point of points around the center of points
-    transform = t2  @ rot_matrix @ t1 # beware of the order of multiplications, not commutative!
-    
+    # beware of the order of multiplications, not commutative!
+    transform = t2  @ rot_matrix @ t1
+
     for point in points:
-        
+
         # homogenous point of the point to be rotated
-        hom_point = matrix([[point[0]], [point[1]], [1]])  
-        
+        hom_point = matrix([[point[0]], [point[1]], [1]])
+
         # rotated point
         rotated_point = transform @ hom_point
-        
+
         # storing
-        new_points.append(( (rotated_point[0] / rotated_point[2]),float(rotated_point[1] / rotated_point[2])))
-        
+        new_points.append(
+            ((rotated_point[0] / rotated_point[2]), float(rotated_point[1] / rotated_point[2])))
+
     return new_points
+
 
 def centroid(points):
     xs, ys = zip(*points)
-    
+
     return (sum(xs) / len(xs), sum(ys) / len(ys))
+
 
 def angle_between(point, centroid):
     dx = centroid[0] - point[0]
     dy = centroid[1] - point[1]
-    
+
     # return the angle in degrees
-    return atan2(dy, dx) * 180 / pi 
-    
-    # assert(angle_between((-10, -10), (0,0)) == 45.0) 
-    # some 'unit testing' whether the function does what it is supposed to do
+    return atan2(dy, dx) * 180 / pi
+
 
 def scale(points):
     # the desired interval size
     size = 100
-    
+
     xs, ys = zip(*points)
-    
+
     # minimum and maximum occurrences of x and y values of the points
     x_min, x_max = min(xs), max(xs)
     y_min, y_max = min(ys), max(ys)
-    
+
     # calculate the range of the coordinates of the points
     x_range = x_max - x_min
     y_range = y_max - y_min
-    
+
     points_new = []
-    
+
     # map the points to the desired interval
     for p in points:
         p_new = ((p[0] - x_min) * size / x_range,
                  (p[1] - y_min) * size / y_range)
         points_new.append(p_new)
-        
+
     return points_new
+
 
 def normalize(points):
     # use all the processing functions from above to transform our set of points into the desired shape
@@ -153,13 +163,14 @@ def normalize(points):
     angle = -angle_between(points_new[0], centroid(points_new))
     points_new = rotate(points_new, centroid(points_new), angle)
     points_new = scale(points_new)
-    
+
     return points_new
+
 
 def calculate_similarity(sample, template):
     dist_all = 0
-    for p1, p2 in zip(sample,template):
+    for p1, p2 in zip(sample, template):
         dist = abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
         dist_all += dist
-        
+
     return dist_all
